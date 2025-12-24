@@ -45,7 +45,6 @@ These mirrors are listed on the official Arch Linux mirror list as Tier-1 with r
 - `rsync://xtom.de/archlinux/`
 - `rsync://rwth-aachen.de/archlinux/` [Arch Linux](https://archlinux.org/mirrors/tier/1)
 
-![Pasted image 20251224205713](Pasted%20image%2020251224205713.png)
 
 Initially i tried to connect to the first one (being 23m.com) however i got this error in the terminal:
 ```bash
@@ -135,7 +134,6 @@ rsync warning: some files vanished before they could be transferred (code 24)
 Running rsync again gets rid of that altogether, and the second run was CONSIDERABLY faster(Took only 19 minutes to fix said files) and it gave 0 warnings.
 
 By the end, all went as planned, and the /srv/archmirror contained the following directories:
-![Pasted image 20251224181402](Pasted%20image%2020251224181402.png)
 - This is the expected tree layout after syncing from an official tier 1 mirror.
 
 What i did next was change the mirror to read only, this is the best practice. Of course rsync will still work because it uses temp files and atomic renames:
