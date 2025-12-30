@@ -143,3 +143,186 @@ What i did next was change the mirror to read only, this is the best practice. O
 sudo chown -R root:root /srv/archmirror
 sudo chmod -R a-w /srv/archmirror
 ```
+---
+## Next step, Hosting:
+Firstly, `sudo pacman -S nginx` to install nginx for hosting.
+`sudo systemctl enable --now nginx` to enable it.
+The immediate next thing to do is to serve the mirror's directory with nginx, to do that we gotta change the nginx configs:
+```bash
+sudo nano /etc/nginx/nginx.conf
+```
+i changed it into this for the server block:
+```bash
+//ILL OPEN AND SHOW THIS LATER DONT FORGET :sob:
+```
+then just run this to see what's happening and reload it:
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+I tested if it worked or not via `curl http://localhost/core/` and that was that, it worked.
+
+This was very surprising because things usually don't just work out of the box, and it didn't. 
+>Initially i started with just this in the server block:
+```nginx
+server {
+    listen 80;
+    server_name _;
+    root /srv/archmirror;
+
+    autoindex on;
+}
+```
+Very simplistic just to be able to test.
+
+Yes, nginx was running, but again, it only worked on localhost, so nobody's got access to anything unless they're on the same wifi. We'll get back to this soon.
+
+To ever check the status of nginx, i just run `systemctl status nginx`, for the logs `journalctl -u nginx`, and for access logs 
+```bash
+cat /var/log/nginx/access.log
+```
+for example:
+```
+◄ 12s ◎ cat /var/log/nginx/access.log                                                   ⌂ 05:02
+
+127.0.0.1 - - [25/Dec/2025:04:22:21 +0100] "HEAD / HTTP/1.1" 200 0 "-" "curl/8.17.0"
+127.0.0.1 - - [25/Dec/2025:04:22:41 +0100] "GET /core/os/x86_64/ HTTP/1.1" 404 153 "-" "curl/8.17.0"
+127.0.0.1 - - [25/Dec/2025:04:30:48 +0100] "GET /core/os/x86_64/ HTTP/1.1" 404 153 "-" "curl/8.17.0"
+127.0.0.1 - - [25/Dec/2025:04:34:20 +0100] "GET /core/os/x86_64/ HTTP/1.1" 404 153 "-" "curl/8.17.0"
+```
+## DNS:
+Now realistically speaking, even if we ignore how dangerous having your IP just exposed to the public to use, it's also incredibly inconsistent to just give people my IP for them to be able to connect to the mirror, because it's dynamic.
+To mitigate all of that, we use a DNS, or a domain name system. 
+For this i went with `deSEC` because it was free and didn't require much hassle. I don't really care what the address ends with as long as it's a working address i can utilize, so there's no need to pay for a cloudflare DNS when there's free alternatives.
+
+I ended up creating this DNS:
+```DNS
+mirror.safi-abidi-arch-mirror.dedyn.io
+```
+it's not flashy but it'll do its job.
+
+## Automation:
+Now here's the thing. It's cool to know what to copy paste to sync the mirror every time, but that's neither sustainable nor efficient nor will it teach me anything about maintaining such a huge project. So it's important to automate the things we have already established and know work, and make sure to add more important things to make life easier.
+So, the goal of automation is:
+- Run the sync **reliably**
+- Run it **without manual intervention**
+- Make failures **visible**
+- Avoid unnecessary load (both on my system and upstream mirrors)
+
+As it stands, here's the best way to show the structure of the project so far:
+```scss
+[ Upstream Arch Mirror ]
+           ↓ (rsync)
+[ My Local Mirror Storage ]
+           ↓ (nginx)
+[ HTTP Mirror Endpoint ]
+           ↓
+[ Internet (blocked by CGNAT,ISPs fault) ]
+```
+Only the **last arrow** is currently broken. Everything above it works.
+I have this shell script:
+```bash
+nano /usr/local/bin/archmirror-sync.sh
+```
+inside is this(i'll add comments here to explain):
+```bash
+#!/bin/bash
+#this line's for safety:
+set -euo pipefail
+#-e to exit immediately on error
+#-u to error when we have undefined variables
+#-o pipefail to catch any errors within the pipelines
+
+#the where from: 
+SOURCE="rsync://mirror.selfnet.de/archlinux/"
+#and the where to:
+DEST="/srv/archmirror"
+#then just the command i always use to sync:
+rsync -avz --delete --delay-updates \
+  --partial \
+  --timeout=600 \
+  "$SOURCE" "$DEST"
+#this writes what's called an "ISO-8601 timestamp" of the last successful sync, it's cleared me from having to deal with logs:
+date -Is > /srv/archmirror/lastsync
+```
+
+```bash
+nano /etc/systemd/system/archmirror-sync.service
+```
+Inside:
+```bash
+#this is to ensure the network is actually up, to prevent failed syncs during early boot, and using "wants" instead of requires avoids hard failures if the networking gets flaky:
+[Unit]
+Description=Arch Linux Mirror Sync
+Wants=network-online.target
+After=network-online.target
+
+
+[Service]
+Type=oneshot
+#Type=oneshot just means the service runs, does its job, and exits
+ExecStart=/usr/local/bin/archmirror-sync.sh
+#ExecStart points directly to the script
+Nice=10
+#Nice=10 lowers the CPU priority and prevents the mirror sync from impacting interactive usage
+IOSchedulingClass=idle 
+#this last part stops the disk I/O from happening unless the system is idle
+#all in all most of this is to make sure the mirror never hogs resources on the pc
+```
+During execution systemd will show: `Active: activating (start)`
+Now for the timer:
+```bash
+nano /etc/systemd/system/archmirror-sync.timer
+```
+Which has:
+```bash
+#timer definition:
+[Unit]
+Description=Daily Arch Mirror Sync
+#Runs exactly at 03:00, off-peak hours for both bandwidth and upstream mirrors:
+[Timer]
+OnCalendar=*-*-* 03:00:00
+#if the system was off at 3, the it does it immediately after boot to prevent missing any syncs:
+Persistent=true
+#this is what allows enabling the timer via systemctl enable:
+[Install]
+WantedBy=timers.target
+```
+
+An example of how i could tell if the automation was actually working properly:
+```bash
+systemctl list-timers | grep archmirror
+```
+Which showed for example:
+```bash
+Wed 2025-12-31 03:00:00 CET    22h Tue 2025-12-30 03:00:03 CET 1h 53min ago archmirror-sync.timer            archmirror-sync.service
+```
+To check service history:
+```bash
+journalctl -u archmirror-sync.service
+```
+And for a live view:
+```bash
+journalctl -fu archmirror-sync.service
+```
+Which prints:
+```
+Dec 30 02:52:18 ArchV systemd[1]: archmirror-sync.service: Deactivated successfully.
+Dec 30 02:52:18 ArchV systemd[1]: Finished Arch Linux Mirror Sync.
+Dec 30 02:52:18 ArchV systemd[1]: archmirror-sync.service: Consumed 7.823s CPU time over 17min 23.439s wall clock time, 3.9G memory peak.
+Dec 30 03:00:03 ArchV systemd[1]: Starting Arch Linux Mirror Sync...
+Dec 30 03:00:08 ArchV archmirror-sync.sh[8534]: receiving file list ... done
+Dec 30 03:00:09 ArchV archmirror-sync.sh[8547]: lastsync
+Dec 30 03:00:09 ArchV archmirror-sync.sh[8547]: sent 63 bytes  received 6,597,720 bytes  1,015,043.54 bytes/sec
+Dec 30 03:00:09 ArchV archmirror-sync.sh[8547]: total size is 140,220,413,320  speedup is 21,252.66
+Dec 30 03:00:09 ArchV systemd[1]: archmirror-sync.service: Deactivated successfully.
+Dec 30 03:00:09 ArchV systemd[1]: Finished Arch Linux Mirror Sync.
+```
+>What's printed is live, and does change in real time if it's doing a sync.
+
+If i ever want to (or need to, but i doubt i will) check the space occupied/free space for the mirror i just run `df -h /srv`
+![](Pasted%20image%2020251230050112.png)
+
+```C
+//Next section will probably be either setting up a dashboard, or keeping it simple and instead setting up alerts. If i set up alerts, ssh-ing into this pc can allow me to check logs and errors asap, might be the next step
+```
