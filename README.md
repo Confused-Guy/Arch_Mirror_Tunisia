@@ -135,7 +135,9 @@ rsync warning: some files vanished before they could be transferred (code 24)
 Running rsync again gets rid of that altogether, and the second run was CONSIDERABLY faster(Took only 19 minutes to fix said files) and it gave 0 warnings.
 
 By the end, all went as planned, and the /srv/archmirror contained the following directories:
+
 ![Pasted image 20251224181402](Pasted%20image%2020251224181402.png)
+
 - This is the expected tree layout after syncing from an official tier 1 mirror.
 
 What i did next was change the mirror to read only, this is the best practice. Of course rsync will still work because it uses temp files and atomic renames:
@@ -320,7 +322,8 @@ Dec 30 03:00:09 ArchV systemd[1]: Finished Arch Linux Mirror Sync.
 ```
 >What's printed is live, and does change in real time if it's doing a sync.
 
-If i ever want to (or need to, but i doubt i will) check the space occupied/free space for the mirror i just run `df -h /srv`
+If i ever want to (or need to, but i doubt i will) check the space occupied/free space for the mirror i just run `df -h /srv`:
+
 ![](Pasted%20image%2020251230050112.png)
 
 ```C
