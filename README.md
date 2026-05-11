@@ -1,27 +1,33 @@
 # Arch Linux Mirror (Self-Hosted)
+
 Hi! This is where i'll be documenting all the steps i took to set up the arch mirror:
+
 ## Project Scope and Intent
 
 This project implements a **self-hosted Arch Linux package mirror** for learning and experimentation! Later on i'll expand and automate in hopes of making it to the official arch mirror list.
 
 But the goal at this stage is **not** to operate an official Tier-1 or Tier-2 mirror, but to:
-- Understand how Arch Linux mirrors work internally
-- Mirror a subset of Arch repositories correctly
-- Serve them locally over HTTP
-- Ensure compatibility with `pacman`
-- Build a setup that can later be automated and documented properly
+
+* Understand how Arch Linux mirrors work internally
+* Mirror a subset of Arch repositories correctly
+* Serve them locally over HTTP
+* Ensure compatibility with `pacman`
+* Build a setup that can later be automated and documented properly
 
 The mirror is hosted on my old laptop, intended for controlled, low-traffic usage.
 
 ---
+
 ## System Environment
 
-- Distribution: Arch Linux
-- Host: Old personal laptop
-- Architecture: `x86_64`
-- Available storage: ~380 GB free on root file-system (df -f to show the available storage on the NVMe)
-This amount of storage is sufficient for mirroring the entirety of Arch repositories from a tier 1 mirror, with a lot of room for growth.
+* Distribution: Arch Linux
+* Host: Old personal laptop
+* Architecture: `x86_64`
+* Available storage: ~380 GB free on root file-system (df -f to show the available storage on the NVMe)
+  This amount of storage is sufficient for mirroring the entirety of Arch repositories from a tier 1 mirror, with a lot of room for growth.
+
 ---
+
 ## File-system Preparation
 
 Arch Linux mirrors are served as static file trees.  
@@ -29,26 +35,31 @@ According to the File-system Hierarchy Standard (FHS), service data intended to 
 So:
 Created these directories for the mirror contents:
 
-```bash
+```
 sudo mkdir -p /srv/archmirror
 sudo chown -R $USER:$USER /srv/archmirror
 ```
+
 ---
+
 ## Which mirror to clone?
+
 There's a lot that goes into which mirror you should sync to before you get access to sync directly from the original arch mirror. Since i'm in Tunisia, the closest and most consistent choice at my disposal is Germany's mirror list:
 
 I had a couple of choices for this:
 These mirrors are listed on the official Arch Linux mirror list as Tier-1 with rsync support:
-- `rsync://23m.com/archlinux/`
-- `rsync://gwdg.de/archlinux/`
-- `rsync://selfnet.de/archlinux/`
-- `rsync://xtom.de/archlinux/`
-- `rsync://rwth-aachen.de/archlinux/` [Arch Linux](https://archlinux.org/mirrors/tier/1)
 
-![Pasted image 20251224205713](Pasted%20image%2020251224205713.png)
+* `rsync://23m.com/archlinux/`
+* `rsync://gwdg.de/archlinux/`
+* `rsync://selfnet.de/archlinux/`
+* `rsync://xtom.de/archlinux/`
+* `rsync://rwth-aachen.de/archlinux/` [Arch Linux](https://archlinux.org/mirrors/tier/1)
+
+[![Pasted image 20251224205713](https://github.com/Confused-Guy/Arch_Mirror_Tunisia/raw/main/Pasted%20image%2020251224205713.png)](/Confused-Guy/Arch_Mirror_Tunisia/blob/main/Pasted%20image%2020251224205713.png)
 
 Initially i tried to connect to the first one (being 23m.com) however i got this error in the terminal:
-```bash
+
+```
 ◄ 0s ○ rsync -avz --delete --delay-updates \ 
 rsync://23m.com/archlinux/ \ /srv/archmirror/ 
 rsync: [Receiver] failed to connect to 23m.com (212.83.32.5): No route to host (113) 
@@ -57,22 +68,25 @@ rsync error: error in socket IO (code 10) at clientserver.c(139) [Receiver=3.4.1
 ◄ 0s ○
 ```
 
-What this error basically told me is that my machine knows the ip, but the network stack couldn't find a valid route to it; this could indicate an ISP routing issue, that the mirror was blocking my networl/region, an upstream firewall, or a temporary outage. 
+What this error basically told me is that my machine knows the ip, but the network stack couldn't find a valid route to it; this could indicate an ISP routing issue, that the mirror was blocking my networl/region, an upstream firewall, or a temporary outage.
 Also:
-```Bash
+
+```
 failed to connect to 23m.com (2a00:f48:1007::3): Network is unreachable (101)
 ```
+
 Just means that my system doesn't have working IPv6 connectivity, when rsync tries it, it fails instantly. Which is fine and not a problem by itself.
 
 TLDR; rsync never got past the TCP connection phase>no data got transferred>failure.
 
 All this means is that 23m.com wasn't reachable from my network.
 Even Tier-1 mirrors:
-- May block certain ASNs
-- May have regional routing quirks
-- May be reachable via HTTP but not rsync
-- May temporarily drop rsync access
-Being Tier-1 =/= universally reachable.
+
+* May block certain ASNs
+* May have regional routing quirks
+* May be reachable via HTTP but not rsync
+* May temporarily drop rsync access
+  Being Tier-1 =/= universally reachable.
 
 With all that considered, i instead used `rsync://mirror.selfnet.de/archlinux` and ran into none of those issues, so we'll proceed with it instead.
 
@@ -81,33 +95,36 @@ With all that considered, i instead used `rsync://mirror.selfnet.de/archlinux` a
 ## rsync set-up and result:
 
 To actually be able to retrieve from the mirrors we need rsync, which is arch infrastructure so we have to use pacman, not yay or peru:
-```bash
+
+```
 sudo pacman -S rsync
 ```
 
 ### Important rsync flags
 
-- `-a` archive  
-    Preserves permissions, symlinks, timestamps
-- `-v` verbose  
-    To see what’s happening
-- `-z` compression  
-    For saving bandwidth
-- `--delete`  
-    Removes files deleted upstream  
-    (dangerous without understanding, but needed nonetheless)
-- `--delay-updates`  
-    Prevents partial states during sync
-This is what keeps the mirror entirely consistent.
+* `-a` archive  
+  Preserves permissions, symlinks, timestamps
+* `-v` verbose  
+  To see what's happening
+* `-z` compression  
+  For saving bandwidth
+* `--delete`  
+  Removes files deleted upstream  
+  (dangerous without understanding, but needed nonetheless)
+* `--delay-updates`  
+  Prevents partial states during sync
+  This is what keeps the mirror entirely consistent.
 
 So we end up with:
-```bash
+
+```
 rsync -avz --delete --delay-updates \
   rsync://mirror.selfnet.de/archlinux/ \
   /srv/archmirror/
 ```
 
-This is what i got after the rsync: 
+This is what i got after the rsync:
+
 ```
 sent 795,932 bytes received 137,902,317,850 bytes 3,342,417.05 bytes/sec 
 total size is 138,253,860,081 speedup is 1.00 
@@ -119,54 +136,69 @@ This basically means:
 -received 137,902,317,850 bytes
 -total size is 138,253,860,081
 -speedup is 1.00
->>I pulled about 138~ GBs, which matches a partial Arch mirror.
->no corruption implied
->the mirror is usable
->and the transfer completed normally
+
+> > I pulled about 138~ GBs, which matches a partial Arch mirror.
+> > no corruption implied
+> > the mirror is usable
+> > and the transfer completed normally
 
 So, all in all, the sync succeeded!
 
 To address the rsync warning:
-```bash
+
+```
 rsync warning: some files vanished before they could be transferred (code 24)
 ```
-- This isn't a problem at all, all it means that the upstream mirror changed WHILE i was syncing since the package indexes are constantly updated, or a file coulda been renamed or removed mid transfer, which is very normal for live package repositories.
+
+* This isn't a problem at all, all it means that the upstream mirror changed WHILE i was syncing since the package indexes are constantly updated, or a file coulda been renamed or removed mid transfer, which is very normal for live package repositories.
 
 Running rsync again gets rid of that altogether, and the second run was CONSIDERABLY faster(Took only 19 minutes to fix said files) and it gave 0 warnings.
 
 By the end, all went as planned, and the /srv/archmirror contained the following directories:
 
-![Pasted image 20251224181402](Pasted%20image%2020251224181402.png)
+[![Pasted image 20251224181402](https://github.com/Confused-Guy/Arch_Mirror_Tunisia/raw/main/Pasted%20image%2020251224181402.png)](/Confused-Guy/Arch_Mirror_Tunisia/blob/main/Pasted%20image%2020251224181402.png)
 
-- This is the expected tree layout after syncing from an official tier 1 mirror.
+* This is the expected tree layout after syncing from an official tier 1 mirror.
 
 What i did next was change the mirror to read only, this is the best practice. Of course rsync will still work because it uses temp files and atomic renames:
-```Bash
+
+```
 sudo chown -R root:root /srv/archmirror
 sudo chmod -R a-w /srv/archmirror
 ```
+
 ---
+
 ## Next step, Hosting:
+
 Firstly, `sudo pacman -S nginx` to install nginx for hosting.
 `sudo systemctl enable --now nginx` to enable it.
 The immediate next thing to do is to serve the mirror's directory with nginx, to do that we gotta change the nginx configs:
-```bash
+
+```
 sudo nano /etc/nginx/nginx.conf
 ```
+
 i changed it into this for the server block:
-```bash
+
+```
 //ILL OPEN AND SHOW THIS LATER DONT FORGET :sob:
 ```
+
 then just run this to see what's happening and reload it:
-```bash
+
+```
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
 I tested if it worked or not via `curl http://localhost/core/` and that was that, it worked.
 
-This was very surprising because things usually don't just work out of the box, and it didn't. 
->Initially i started with just this in the server block:
-```nginx
+This was very surprising because things usually don't just work out of the box, and it didn't.
+
+> Initially i started with just this in the server block:
+
+```
 server {
     listen 80;
     server_name _;
@@ -175,15 +207,19 @@ server {
     autoindex on;
 }
 ```
+
 Very simplistic just to be able to test.
 
 Yes, nginx was running, but again, it only worked on localhost, so nobody's got access to anything unless they're on the same wifi. We'll get back to this soon.
 
-To ever check the status of nginx, i just run `systemctl status nginx`, for the logs `journalctl -u nginx`, and for access logs 
-```bash
+To ever check the status of nginx, i just run `systemctl status nginx`, for the logs `journalctl -u nginx`, and for access logs
+
+```
 cat /var/log/nginx/access.log
 ```
+
 for example:
+
 ```
 ◄ 12s ◎ cat /var/log/nginx/access.log                                                   ⌂ 05:02
 
@@ -192,27 +228,34 @@ for example:
 127.0.0.1 - - [25/Dec/2025:04:30:48 +0100] "GET /core/os/x86_64/ HTTP/1.1" 404 153 "-" "curl/8.17.0"
 127.0.0.1 - - [25/Dec/2025:04:34:20 +0100] "GET /core/os/x86_64/ HTTP/1.1" 404 153 "-" "curl/8.17.0"
 ```
+
 ## DNS:
+
 Now realistically speaking, even if we ignore how dangerous having your IP just exposed to the public to use, it's also incredibly inconsistent to just give people my IP for them to be able to connect to the mirror, because it's dynamic.
-To mitigate all of that, we use a DNS, or a domain name system. 
+To mitigate all of that, we use a DNS, or a domain name system.
 For this i went with `deSEC` because it was free and didn't require much hassle. I don't really care what the address ends with as long as it's a working address i can utilize, so there's no need to pay for a cloudflare DNS when there's free alternatives.
 
 I ended up creating this DNS:
-```DNS
+
+```
 mirror.safi-abidi-arch-mirror.dedyn.io
 ```
+
 it's not flashy but it'll do its job.
 
 ## Automation:
+
 Now here's the thing. It's cool to know what to copy paste to sync the mirror every time, but that's neither sustainable nor efficient nor will it teach me anything about maintaining such a huge project. So it's important to automate the things we have already established and know work, and make sure to add more important things to make life easier.
 So, the goal of automation is:
-- Run the sync **reliably**
-- Run it **without manual intervention**
-- Make failures **visible**
-- Avoid unnecessary load (both on my system and upstream mirrors)
+
+* Run the sync **reliably**
+* Run it **without manual intervention**
+* Make failures **visible**
+* Avoid unnecessary load (both on my system and upstream mirrors)
 
 As it stands, here's the best way to show the structure of the project so far:
-```scss
+
+```
 [ Upstream Arch Mirror ]
            ↓ (rsync)
 [ My Local Mirror Storage ]
@@ -221,13 +264,17 @@ As it stands, here's the best way to show the structure of the project so far:
            ↓
 [ Internet (blocked by CGNAT,ISPs fault) ]
 ```
+
 Only the **last arrow** is currently broken. Everything above it works.
 I have this shell script:
-```bash
+
+```
 nano /usr/local/bin/archmirror-sync.sh
 ```
+
 inside is this(i'll add comments here to explain):
-```bash
+
+```
 #!/bin/bash
 #this line's for safety:
 set -euo pipefail
@@ -248,11 +295,13 @@ rsync -avz --delete --delay-updates \
 date -Is > /srv/archmirror/lastsync
 ```
 
-```bash
+```
 nano /etc/systemd/system/archmirror-sync.service
 ```
+
 Inside:
-```bash
+
+```
 #this is to ensure the network is actually up, to prevent failed syncs during early boot, and using "wants" instead of requires avoids hard failures if the networking gets flaky:
 [Unit]
 Description=Arch Linux Mirror Sync
@@ -271,13 +320,17 @@ IOSchedulingClass=idle
 #this last part stops the disk I/O from happening unless the system is idle
 #all in all most of this is to make sure the mirror never hogs resources on the pc
 ```
+
 During execution systemd will show: `Active: activating (start)`
 Now for the timer:
-```bash
+
+```
 nano /etc/systemd/system/archmirror-sync.timer
 ```
+
 Which has:
-```bash
+
+```
 #timer definition:
 [Unit]
 Description=Daily Arch Mirror Sync
@@ -292,22 +345,31 @@ WantedBy=timers.target
 ```
 
 An example of how i could tell if the automation was actually working properly:
-```bash
+
+```
 systemctl list-timers | grep archmirror
 ```
+
 Which showed for example:
-```bash
+
+```
 Wed 2025-12-31 03:00:00 CET    22h Tue 2025-12-30 03:00:03 CET 1h 53min ago archmirror-sync.timer            archmirror-sync.service
 ```
+
 To check service history:
-```bash
+
+```
 journalctl -u archmirror-sync.service
 ```
+
 And for a live view:
-```bash
+
+```
 journalctl -fu archmirror-sync.service
 ```
+
 Which prints:
+
 ```
 Dec 30 02:52:18 ArchV systemd[1]: archmirror-sync.service: Deactivated successfully.
 Dec 30 02:52:18 ArchV systemd[1]: Finished Arch Linux Mirror Sync.
@@ -320,12 +382,233 @@ Dec 30 03:00:09 ArchV archmirror-sync.sh[8547]: total size is 140,220,413,320  s
 Dec 30 03:00:09 ArchV systemd[1]: archmirror-sync.service: Deactivated successfully.
 Dec 30 03:00:09 ArchV systemd[1]: Finished Arch Linux Mirror Sync.
 ```
->What's printed is live, and does change in real time if it's doing a sync.
+
+> What's printed is live, and does change in real time if it's doing a sync.
 
 If i ever want to (or need to, but i doubt i will) check the space occupied/free space for the mirror i just run `df -h /srv`:
 
-![](Pasted%20image%2020251230050112.png)
+[![](https://github.com/Confused-Guy/Arch_Mirror_Tunisia/raw/main/Pasted%20image%2020251230050112.png)](/Confused-Guy/Arch_Mirror_Tunisia/blob/main/Pasted%20image%2020251230050112.png)
 
-```C
-//Next section will probably be either setting up a dashboard, or keeping it simple and instead setting up alerts. If i set up alerts, ssh-ing into this pc can allow me to check logs and errors asap, might be the next step
+---
+
+## Going Public: Getting a Static IP and Escaping CGNAT
+
+The previous blocker was CGNAT — Tunisie Telecom was assigning a private `10.x.x.x` address at the router level, meaning the machine was completely unreachable from the public internet regardless of port forwarding.
+
+The fix: upgraded the internet plan to include a **fixed public IP**. Tunisie Telecom sent an SMS confirming the static IP assignment, followed by a phone call to configure the router's APN settings. After a cold reboot of the router, `curl ifconfig.me` confirmed a real routable address:
+
 ```
+197.5.200.41
+```
+
+Verified with whois:
+```
+netname: Tunisie Telecom
+country: TN
+```
+
+This is the permanent static IP the mirror now runs on.
+
+---
+
+## Port Forwarding
+
+With a real public IP, the router needed to forward inbound traffic to the machine's local address (`192.168.1.166`, bound via MAC reservation so it never changes).
+
+The local IP was confirmed with:
+```
+ip addr show | grep "inet " | grep -v 127.0.0.1
+```
+
+Port forwarding rules added in the router admin panel:
+- `443 → 192.168.1.166:443` (HTTPS, the one that matters)
+- `80 → 192.168.1.166:80` (blocked by TT at ISP level, but added anyway)
+
+Port 80 turned out to be blocked by Tunisie Telecom on residential lines, which is common. Port 443 works fine. Since Arch's official mirror requirements prefer HTTPS anyway, this is not a problem.
+
+---
+
+## Domain: mirror.safiabidi.com
+
+Moved away from the `dedyn.io` hostname. The mirror now lives at:
+
+```
+https://mirror.safiabidi.com
+```
+
+This is a subdomain of my personal domain managed via Cloudflare. The DNS record is:
+
+- **Type:** A
+- **Name:** `mirror`
+- **Value:** `197.5.200.41`
+- **Proxy:** OFF (grey cloud — mirrors need direct connections, proxying breaks rsync and pacman)
+- **TTL:** Auto
+
+The orange cloud (Cloudflare proxy) must stay off. Enabling it would route all traffic through Cloudflare's CDN, which is incompatible with how pacman and rsync resolve mirrors.
+
+---
+
+## nginx Configuration (Final)
+
+The nginx config went through several iterations. The final working state at `/etc/nginx/conf.d/archmirror.conf`:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mirror.safiabidi.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name mirror.safiabidi.com;
+    root /srv/archmirror;
+    autoindex on;
+    access_log /var/log/nginx/archmirror.access.log;
+    error_log /var/log/nginx/archmirror.error.log;
+
+    ssl_certificate /etc/letsencrypt/live/mirror.safiabidi.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mirror.safiabidi.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /dashboard {
+        alias /srv/archmirror-dashboard;
+        index index.html;
+    }
+}
+```
+
+The HTTP server block just redirects everything to HTTPS. The dashboard is served from a separate directory so it doesn't interfere with the mirror's directory listing at `/`.
+
+---
+
+## HTTPS via Let's Encrypt
+
+With port 80 confirmed open at the time of cert issuance (TT hadn't blocked it yet during the setup window), certbot used the standard HTTP challenge:
+
+```
+sudo certbot --nginx -d mirror.safiabidi.com
+```
+
+Output:
+```
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/mirror.safiabidi.com/fullchain.pem
+Congratulations! You have successfully enabled HTTPS on https://mirror.safiabidi.com
+```
+
+Certificate auto-renewal is handled by certbot's systemd timer. The cert expires 2026-08-09 and will renew automatically before then.
+
+---
+
+## Updated Sync Script
+
+The original sync script had two issues:
+1. It used `-avz` flags instead of the flags Arch officially requires
+2. It wrote a timestamp to `lastsync` instead of `lastupdate` — the latter is what Arch's mirror monitoring infrastructure and most tooling actually checks
+
+The corrected `/usr/local/bin/archmirror-sync.sh`:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+SOURCE="rsync://mirror.selfnet.de/archlinux/"
+DEST="/srv/archmirror"
+
+rsync -rlptH --safe-links --delete-delay --delay-updates \
+  --partial \
+  --timeout=600 \
+  "$SOURCE" "$DEST"
+
+date +%s > "$DEST/lastupdate"
+```
+
+The flags `-rlptH --safe-links --delete-delay --delay-updates` are the exact flags specified in the official Arch mirror documentation at [DeveloperWiki:NewMirrors](https://wiki.archlinux.org/title/DeveloperWiki:NewMirrors).
+
+---
+
+## Live Dashboard
+
+The mirror has a public dashboard at `https://mirror.safiabidi.com/dashboard` showing live stats.
+
+It pulls data from `/stats.json` which is generated every 60 seconds by a stats script at `/usr/local/bin/mirror-stats.sh` and written directly into `/srv/archmirror/stats.json` so nginx serves it as a static file — no special location block needed.
+
+Stats displayed:
+- Last sync time and sync status (in sync / delayed)
+- Disk used / free
+- Requests today and unique IPs
+- Data served today (outbound GB)
+- Uptime over last 30 days
+- Per-repository sizes
+- Traffic chart (last 7 days)
+- Pacman config snippet for using the mirror
+
+The stats service is managed by a systemd timer:
+
+```
+/etc/systemd/system/mirror-stats.service
+/etc/systemd/system/mirror-stats.timer  (fires every 60 seconds)
+```
+
+Enable with:
+```
+sudo systemctl enable --now mirror-stats.timer
+```
+
+---
+
+## Firewall (UFW)
+
+Final UFW ruleset — minimal and clean:
+
+```
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 443/tcp
+sudo ufw allow 22/tcp
+sudo ufw enable
+```
+
+Port 80 is blocked by TT at the ISP level anyway. Port 873 (rsync) doesn't need to be open inbound since the machine initiates all syncs outbound. SSH (22) is kept open but accessed exclusively via Tailscale in practice.
+
+---
+
+## Current Status (2026-05-11)
+
+```
+[ Upstream Arch Mirror (mirror.selfnet.de, Germany) ]
+           ↓ (rsync, nightly at 03:00)
+[ /srv/archmirror on local machine ]
+           ↓ (nginx, HTTPS)
+[ https://mirror.safiabidi.com ]
+           ↓
+[ Public internet — fully reachable ]
+```
+
+- **Mirror URL:** https://mirror.safiabidi.com
+- **Dashboard:** https://mirror.safiabidi.com/dashboard
+- **Static IP:** 197.5.200.41 (Tunisie Telecom, TN)
+- **Storage:** ~180 GB used, ~264 GB free
+- **Certificate:** Let's Encrypt, valid until 2026-08-09
+- **Status:** Live. Tunisia's first public Arch Linux mirror.
+
+To use this mirror, add to the top of `/etc/pacman.d/mirrorlist`:
+```
+Server = https://mirror.safiabidi.com/$repo/os/$arch
+```
+
+---
+
+## Next Steps
+
+- [ ] Wait for a full sync cycle to complete and verify `lastupdate` reflects current time
+- [ ] Submit to the official Arch mirror list as a Tier 2 mirror via [GitLab issue](https://gitlab.archlinux.org/archlinux/arch-mirrors/-/issues)
+- [ ] Accumulate uptime history over several weeks
+- [ ] Apply for Tier 1 once reliability is established
