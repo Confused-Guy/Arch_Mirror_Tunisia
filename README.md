@@ -440,7 +440,7 @@ This is a subdomain of my personal domain managed via Cloudflare. The DNS record
 
 - **Type:** A
 - **Name:** `mirror`
-- **Value:** `197.5.200.41`
+- **Value:** `curl ifconfig.me confirmed a routable public IP. Don't worry what it is`
 - **Proxy:** OFF (grey cloud — mirrors need direct connections, proxying breaks rsync and pacman)
 - **TTL:** Auto
 
@@ -594,7 +594,7 @@ Port 80 is blocked by TT at the ISP level anyway. Port 873 (rsync) doesn't need 
 
 - **Mirror URL:** https://mirror.safiabidi.com
 - **Dashboard:** https://mirror.safiabidi.com/dashboard
-- **Static IP:** 197.5.200.41 (Tunisie Telecom, TN)
+- **Static IP:** (Tunisie Telecom, TN)
 - **Storage:** ~180 GB used, ~264 GB free
 - **Certificate:** Let's Encrypt, valid until 2026-08-09
 - **Status:** Live. Tunisia's first public Arch Linux mirror.
