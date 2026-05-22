@@ -395,11 +395,7 @@ If i ever want to (or need to, but i doubt i will) check the space occupied/free
 
 The previous blocker was CGNAT — Tunisie Telecom was assigning a private `10.x.x.x` address at the router level, meaning the machine was completely unreachable from the public internet regardless of port forwarding.
 
-The fix: upgraded the internet plan to include a **fixed public IP**. Tunisie Telecom sent an SMS confirming the static IP assignment, followed by a phone call to configure the router's APN settings. After a cold reboot of the router, `curl ifconfig.me` confirmed a real routable address:
-
-```
-197.5.200.41
-```
+The fix: upgraded the internet plan to include a **fixed public IP**. Tunisie Telecom sent an SMS confirming the static IP assignment, followed by a phone call to configure the router's APN settings. After a cold reboot of the router, `curl ifconfig.me` confirmed a real routable address
 
 Verified with whois:
 ```
@@ -413,7 +409,7 @@ This is the permanent static IP the mirror now runs on.
 
 ## Port Forwarding
 
-With a real public IP, the router needed to forward inbound traffic to the machine's local address (`192.168.1.166`, bound via MAC reservation so it never changes).
+With a real public IP, the router needed to forward inbound traffic to the machine's local address, bound via MAC reservation so it never changes).
 
 The local IP was confirmed with:
 ```
@@ -421,8 +417,8 @@ ip addr show | grep "inet " | grep -v 127.0.0.1
 ```
 
 Port forwarding rules added in the router admin panel:
-- `443 → 192.168.1.166:443` (HTTPS, the one that matters)
-- `80 → 192.168.1.166:80` (blocked by TT at ISP level, but added anyway)
+- `443 → 192.xxx.xxx.xxx:443` (HTTPS, the one that matters)
+- `80 → 192.xxx.xxx.xxx:80` (blocked by TT at ISP level, but added anyway)
 
 Port 80 turned out to be blocked by Tunisie Telecom on residential lines, which is common. Port 443 works fine. Since Arch's official mirror requirements prefer HTTPS anyway, this is not a problem.
 
