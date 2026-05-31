@@ -1,0 +1,47 @@
+services:
+  mirror-nginx:
+    user: "0:0"
+    build: ./nginx
+    container_name: mirror-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - mirror-data:/srv/archmirror:ro
+      - mirror-dashboard:/srv/archmirror-dashboard:ro
+      - nginx-logs:/var/log/nginx
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - mirror-sync
+
+  mirror-sync:
+    user: "0:0"
+    build: ./sync
+    container_name: mirror-sync
+    restart: unless-stopped
+    volumes:
+      - mirror-data:/srv/archmirror
+    environment:
+      - SYNC_HOUR=3
+      - SYNC_MINUTE=17
+
+volumes:
+  mirror-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/archmirror
+  mirror-dashboard:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/archmirror-dashboard
+  nginx-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/nginx
