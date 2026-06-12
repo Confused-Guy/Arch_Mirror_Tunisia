@@ -6,7 +6,7 @@ DEST="/srv/archmirror"
 rsync -rlptH --safe-links --delete-delay --delay-updates \
   --partial \
   --timeout=600 \
-  --exclude=stats.json \  
+  --exclude=stats.json \
   "$SOURCE" "$DEST"
 
 date +%s > "$DEST/lastupdate"
