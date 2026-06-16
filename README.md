@@ -1,4 +1,4 @@
-# Arch Linux Mirror — Tunisia
+# Arch Linux Mirror - Tunisia
 
 Tunisia's first public Arch Linux mirror. Official Tier 2, listed on [archlinux.org](https://archlinux.org/mirrors/mirror.safiabidi.com/).
 
@@ -20,7 +20,7 @@ Server = https://mirror.safiabidi.com/$repo/os/$arch
 | **Disk** | 200 GB |
 | **Bandwidth** | ~5 Gbps |
 | **Mirror URL** | https://mirror.safiabidi.com |
-| **Status** | Live — Official Tier 2 |
+| **Status** | Live - Official Tier 2 |
 
 ---
 
@@ -46,8 +46,8 @@ The entire stack runs on a VPS hosted at ATI (Agence Tunisienne d'Internet), Tun
 
 Two containers, one shared volume:
 
-- **mirror-nginx** — serves the mirror over HTTPS on ports 80/443. nginx runs inside the container; the host has no system nginx service.
-- **mirror-sync** — runs rsync every 6 hours to sync from upstream. Tries selfnet.de first, falls back to kernel.org then puzzle.ch if DNS or connection fails.
+- **mirror-nginx** - serves the mirror over HTTPS on ports 80/443. nginx runs inside the container; the host has no system nginx service.
+- **mirror-sync** - runs rsync every 6 hours to sync from upstream. Tries selfnet.de first, falls back to kernel.org then puzzle.ch if DNS or connection fails.
 
 Both containers mount `/srv/archmirror` on the host as a shared volume. nginx reads it read-only; the sync container writes to it.
 
@@ -94,12 +94,12 @@ exit 1
 ```
 
 Flag breakdown:
-- `-rlptH` — recursive, preserve symlinks/permissions/timestamps/hardlinks
-- `--safe-links` — ignore symlinks pointing outside the tree
-- `--delete-delay` / `--delay-updates` — atomic updates, mirror is never in a partial state during sync. Note: these flags cause rsync to stage files in a `.~tmp~` directory before moving them into place, so disk usage will temporarily spike during a sync. Don't panic.
-- `--partial` — resume interrupted transfers
-- `--timeout=600` — drop stalled connections after 10 minutes
-- `--exclude=stats.json` — don't overwrite the locally generated stats file
+- `-rlptH` - recursive, preserve symlinks/permissions/timestamps/hardlinks
+- `--safe-links` - ignore symlinks pointing outside the tree
+- `--delete-delay` / `--delay-updates` - atomic updates, mirror is never in a partial state during sync. Note: these flags cause rsync to stage files in a `.~tmp~` directory before moving them into place, so disk usage will temporarily spike during a sync. Don't panic.
+- `--partial` - resume interrupted transfers
+- `--timeout=600` - drop stalled connections after 10 minutes
+- `--exclude=stats.json` - don't overwrite the locally generated stats file
 
 The fallback list exists because DNS resolution for `mirror.selfnet.de` occasionally fails from inside the Docker container (transient ATI DNS issue). If the first source fails, it tries the next one automatically.
 
@@ -209,7 +209,7 @@ The nginx container mounts `/etc/letsencrypt` read-only, so renewed certs are pi
 
 ```bash
 #!/bin/bash
-# /usr/local/bin/mirror-stats.sh — generates /srv/archmirror/stats.json
+# /usr/local/bin/mirror-stats.sh - generates /srv/archmirror/stats.json
 
 MIRROR_DIR="/srv/archmirror"
 ACCESS_LOG="/var/log/nginx/archmirror.access.log"
@@ -377,7 +377,7 @@ cat "$CACHE_FILE"
 Important notes:
 - Uses `grep -a` instead of `grep` or `zgrep` because nginx log files with very long lines get misdetected as binary files, causing silent zero counts
 - Uses `date -u` for "today" to match the UTC timestamps nginx writes inside Docker
-- Reads `bc` for floating point uptime calculation — install it if missing (`sudo pacman -S bc`)
+- Reads `bc` for floating point uptime calculation - install it if missing (`sudo pacman -S bc`)
 - The persistent file at `/var/lib/mirror-stats/persistent.json` accumulates all-time unique IP hashes across log rotations
 - `baseline.json` at `/var/lib/mirror-stats/baseline.json` holds a `total_bytes_served_offset` for migrating historical totals from a previous setup. Set to `{"total_bytes_served_offset": 0}` for a fresh install.
 
@@ -425,19 +425,18 @@ sudo systemctl enable --now mirror-stats.timer
 UFW, minimal ruleset:
 
 ```bash
-sudo ufw allow 22
 sudo ufw allow 80
 sudo ufw allow 443
 sudo ufw enable
 ```
 
-Port 873 (rsync) does not need to be open inbound — the server initiates all syncs outbound.
+Port 873 (rsync) does not need to be open inbound - the server initiates all syncs outbound.
 
 ---
 
 ### Remote Access
 
-Tailscale is installed on the VPS. All SSH access goes through the Tailscale IP in practice; the public port 22 is open but not used directly. Install:
+Tailscale is installed on the VPS. SSH is only accessible via the Tailscale IP, port 22 is not open on the public firewall. Install:
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
@@ -538,7 +537,7 @@ Tier 1 requires syncing directly from `rsync.archlinux.org`, which requires expl
 ---
 
 <details>
-<summary><strong>History — From Laptop to VPS (click to expand)</strong></summary>
+<summary><strong>History - From Laptop to VPS (click to expand)</strong></summary>
 
 ## Origin
 
@@ -560,7 +559,7 @@ rsync: [Receiver] failed to connect to 23m.com (212.83.32.5): No route to host (
 rsync: [Receiver] failed to connect to 23m.com (2a00:f48:1007::3): Network is unreachable (101)
 ```
 
-`No route to host` means the network stack couldn't find a valid path to the destination — likely an ISP routing issue, regional block, or upstream firewall. The IPv6 failure is a separate issue: the residential connection had no working IPv6. Neither is inherently a problem; Tier 1 mirrors aren't universally reachable:
+`No route to host` means the network stack couldn't find a valid path to the destination - likely an ISP routing issue, regional block, or upstream firewall. The IPv6 failure is a separate issue: the residential connection had no working IPv6. Neither is inherently a problem; Tier 1 mirrors aren't universally reachable:
 
 - Some block certain ASNs
 - Some have regional routing quirks
@@ -579,7 +578,7 @@ Not a real error. It means the upstream mirror changed files while the sync was 
 
 ## CGNAT Problem
 
-The first major blocker to going public: Tunisie Telecom was assigning a private `10.x.x.x` address at the router level. This is CGNAT — Carrier-Grade NAT — where the ISP shares one public IP across many customers. Port forwarding is useless in this situation because the machine is behind two layers of NAT.
+The first major blocker to going public: Tunisie Telecom was assigning a private `10.x.x.x` address at the router level. This is CGNAT - Carrier-Grade NAT - where the ISP shares one public IP across many customers. Port forwarding is useless in this situation because the machine is behind two layers of NAT.
 
 Fix: upgraded the internet plan to include a fixed public IP. TT sent an SMS confirming the static IP assignment, followed by a phone call to configure the router's APN settings. After a router reboot, `curl ifconfig.me` confirmed a real routable address.
 
@@ -605,7 +604,7 @@ Initially used a free `dedyn.io` hostname via deSEC:
 mirror.safi-abidi-arch-mirror.dedyn.io
 ```
 
-Later moved to a proper subdomain managed via Cloudflare DNS. The A record has the Cloudflare proxy (orange cloud) deliberately disabled — mirrors need direct connections. Proxying through Cloudflare's CDN breaks rsync and causes pacman to see Cloudflare IPs instead of the mirror's real address.
+Later moved to a proper subdomain managed via Cloudflare DNS. The A record has the Cloudflare proxy (orange cloud) deliberately disabled - mirrors need direct connections. Proxying through Cloudflare's CDN breaks rsync and causes pacman to see Cloudflare IPs instead of the mirror's real address.
 
 ---
 
