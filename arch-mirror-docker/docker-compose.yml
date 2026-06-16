@@ -4,6 +4,8 @@ services:
     build: ./nginx
     container_name: mirror-nginx
     restart: unless-stopped
+    environment:
+      - TZ=Africa/Tunis
     ports:
       - "80:80"
       - "443:443"
