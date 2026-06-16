@@ -2,9 +2,9 @@
 set -euo pipefail
 SOURCES="
 rsync://mirror.selfnet.de/archlinux/
-rsync://mirrors.kernel.org/archlinux/
 rsync://mirror.puzzle.ch/archlinux/
 "
+#Removed rsync://mirrors.kernel.org/archlinux/ because it has too many extra testing packages
 DEST="/srv/archmirror"
 
 #The for loop is because selfnet.de kept failing many times.
