@@ -43,17 +43,18 @@ The entire stack runs on a VPS hosted at ATI (Agence Tunisienne d'Internet), Tun
 ## Stack
 
 ### Docker Compose
-
-Two containers, one shared volume:
+Six containers, shared volumes:
 
 - **mirror-nginx** - serves the mirror over HTTPS on ports 80/443. nginx runs inside the container; the host has no system nginx service.
-- **mirror-sync** - runs rsync every 6 hours to sync from upstream. Tries selfnet.de first, falls back to kernel.org then puzzle.ch if DNS or connection fails.
+- **mirror-sync** - runs rsync every 6 hours to sync from upstream. Tries selfnet.de first, falls back to puzzle.ch if DNS or connection fails.
+- **prometheus** - scrapes metrics from node-exporter and nginx-exporter, retains 90 days of data. Bound to localhost only.
+- **node-exporter** - exposes VPS system metrics (CPU, RAM, disk, network) to Prometheus. Bound to localhost only.
+- **nginx-exporter** - scrapes nginx stub_status and exposes it to Prometheus. Bound to localhost only.
+- **grafana** - dashboard and alerting UI, accessible via Tailscale on port 3000/localhost.
 
-Both containers mount `/srv/archmirror` on the host as a shared volume. nginx reads it read-only; the sync container writes to it.
-
-Nginx logs are also volume-mounted to `/var/log/nginx` on the host so the stats script can read them directly without going through Docker.
-
-The full `docker-compose.yml` is in `/arch-mirror-docker/` in this repo.
+Both mirror containers mount /srv/archmirror on the host as a shared volume. nginx reads it read-only; the sync container writes to it.
+Nginx logs are also volume-mounted to /var/log/nginx on the host so the stats script can read them directly without going through Docker.
+The full docker-compose.yml and prometheus.yml are in /arch-mirror-docker/ in this repo.
 
 ---
 
@@ -71,7 +72,6 @@ DEST="/srv/archmirror"
 
 SOURCES="
 rsync://mirror.selfnet.de/archlinux/
-rsync://mirrors.kernel.org/archlinux/
 rsync://mirror.puzzle.ch/archlinux/
 "
 
