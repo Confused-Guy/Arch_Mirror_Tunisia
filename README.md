@@ -178,7 +178,7 @@ HTTP redirects to HTTPS. The dashboard is served from a separate directory so it
 
 Let's Encrypt cert issued via DNS-01 challenge against Cloudflare, **not** `--standalone` or `--nginx`.
 
-Standalone was the original approach but it fights nginx for port 80 on every renewal (nginx runs in Docker and holds 80/443 permanently) — this caused a full cert expiry outage in Sept 2026 when the renewal timer silently failed for weeks. DNS-01 sidesteps this entirely: no port binding, no nginx interaction, works even if nginx is down.
+Standalone was the original approach but it fights nginx for port 80 on every renewal (nginx runs in Docker and holds 80/443 permanently),this caused a full cert expiry outage in Sept 2026 when the renewal timer kept silently failing for weeks. DNS-01 sidesteps this entirely: no port binding, no nginx interaction, works even if nginx is down.
 
 Requires `certbot-dns-cloudflare`:
 ```bash
@@ -214,7 +214,7 @@ Auto-renewal is handled by certbot's systemd timer:
 sudo systemctl enable --now certbot-renew.timer
 ```
 
-The `[renewalparams]` block in `/etc/letsencrypt/renewal/mirror.safiabidi.com.conf` must show `authenticator = dns-cloudflare` — if it ever reverts to `standalone` (e.g. after a manual `certbot certonly` run without `--dns-cloudflare`), renewal will break again.
+The `[renewalparams]` block in `/etc/letsencrypt/renewal/mirror.safiabidi.com.conf` must show `authenticator = dns-cloudflare` if it ever reverts to `standalone` (e.g. after a manual `certbot certonly` run without `--dns-cloudflare`), renewal will break again.
 
 The nginx container mounts `/etc/letsencrypt` read-only, so renewed certs are picked up automatically on the next nginx reload:
 ```bash
