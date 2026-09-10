@@ -176,20 +176,35 @@ HTTP redirects to HTTPS. The dashboard is served from a separate directory so it
 
 ### SSL
 
-Let's Encrypt cert issued via `certbot --standalone` (not `--nginx`, since nginx runs inside Docker and certbot can't find the binary on the host):
+Let's Encrypt cert issued via DNS-01 challenge against Cloudflare, **not** `--standalone` or `--nginx`.
 
+Standalone was the original approach but it fights nginx for port 80 on every renewal (nginx runs in Docker and holds 80/443 permanently) — this caused a full cert expiry outage in Sept 2026 when the renewal timer silently failed for weeks. DNS-01 sidesteps this entirely: no port binding, no nginx interaction, works even if nginx is down.
+
+Requires `certbot-dns-cloudflare`:
 ```bash
-sudo certbot certonly --standalone -d mirror.safiabidi.com
+sudo pacman -S certbot-dns-cloudflare
 ```
 
-This generates the cert but not `options-ssl-nginx.conf` or `ssl-dhparams.pem`, which the nginx config references. Those need to be created manually:
+Cloudflare API token, scoped to `Zone:DNS:Edit` on the `safiabidi.com` zone only (not the global API key), stored at `/etc/letsencrypt/secrets/cloudflare.ini`:
+```ini
+dns_cloudflare_api_token = <token>
+```
+```bash
+sudo chmod 600 /etc/letsencrypt/secrets/cloudflare.ini
+```
+**This file is not committed to git for obvious reasons lol.**
+
+Issue/renew:
+```bash
+sudo certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/secrets/cloudflare.ini -d mirror.safiabidi.com
+```
+
+This generates the cert but not `options-ssl-nginx.conf` or `ssl-dhparams.pem`, which the nginx config references. Those need to be created manually (one-time, not per-renewal):
 
 ```bash
-# Download the options file certbot-nginx normally generates
 sudo curl -o /etc/letsencrypt/options-ssl-nginx.conf \
   https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf
 
-# Generate DH params (takes a minute)
 sudo openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
 ```
 
@@ -199,7 +214,12 @@ Auto-renewal is handled by certbot's systemd timer:
 sudo systemctl enable --now certbot-renew.timer
 ```
 
-The nginx container mounts `/etc/letsencrypt` read-only, so renewed certs are picked up automatically on the next nginx reload.
+The `[renewalparams]` block in `/etc/letsencrypt/renewal/mirror.safiabidi.com.conf` must show `authenticator = dns-cloudflare` — if it ever reverts to `standalone` (e.g. after a manual `certbot certonly` run without `--dns-cloudflare`), renewal will break again.
+
+The nginx container mounts `/etc/letsencrypt` read-only, so renewed certs are picked up automatically on the next nginx reload:
+```bash
+docker compose exec mirror-nginx nginx -s reload
+```
 
 ---
 
