@@ -9,11 +9,27 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     volumes:
       - mirror-data:/srv/archmirror:ro
       - mirror-dashboard:/srv/archmirror-dashboard:ro
       - nginx-logs:/var/log/nginx
       - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - mirror-sync
+
+  mirror-rsyncd:
+    user: "0:0"
+    build: ./rsyncd
+    container_name: mirror-rsyncd
+    restart: unless-stopped
+    ports:
+      - "873:873"
+    volumes:
+      - mirror-data:/srv/archmirror:ro
     depends_on:
       - mirror-sync
 
@@ -70,7 +86,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     ports:
-      - "0.0.0.0:3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
